@@ -1,3 +1,8 @@
+# The dataset used for the project is WS-Dream, collected by Zheng et al. Download the dataset from the below link:
+https://github.com/wsdream/AMF/tree/master/data
+
+# The work done in the project was derived from the publication: Location-Aware Feature Interaction Learning for Web Service Recommendation
+
 # Install the requirements:
 pip3 install -r requirements.txt
 
