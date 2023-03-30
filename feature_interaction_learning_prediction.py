@@ -5,6 +5,7 @@ import tensorflow as tf
 from sklearn.metrics import mean_absolute_error
 from tabulate import tabulate
 import load_data as F
+from CIN import CIN_model_creator
 
 # create argument parser object
 parser = argparse.ArgumentParser()
@@ -16,6 +17,7 @@ parser.add_argument('df_depth', help='Number of rows of data to train with')
 args = parser.parse_args()
 
 # Load the dataset
+
 df = F.driver()
 test_df = df[df['qos_response_time'] == 0]
 train_df = df[df['qos_response_time'] != 0]
@@ -56,7 +58,7 @@ user_country_compressed = user_country_embedding(user_country_one_hot)
 service_country_compressed = service_country_embedding(service_country_one_hot)
 user_as_compressed = user_as_embedding(user_as_one_hot)
 service_as_compressed = service_as_embedding(service_as_one_hot)
-print("Compressed")
+print("Compressed the features")
 
 # Flatten the compressed features
 user_country_flat = tf.keras.layers.Flatten()(user_country_compressed)
@@ -66,40 +68,46 @@ service_as_flat = tf.keras.layers.Flatten()(service_as_compressed)
 
 # Concatenate all flattened features
 concatenated = tf.keras.layers.Concatenate()([user_country_flat, service_country_flat, user_as_flat, service_as_flat])
-print("Concatenated")
+print("Concatenated the features")
 
 # Define the DNN and CIN architectures using TensorFlow
 input_shape = concatenated.shape[1]
 output_shape = 1
-print("Defined architecture")
+print("Defining architecture")
 # DNN
 dnn_model = tf.keras.Sequential([
     tf.keras.layers.Dense(128, activation='relu', input_shape=(input_shape,)),
     tf.keras.layers.Dense(64, activation='relu'),
     tf.keras.layers.Dense(output_shape)
 ])
-print("DNN done")
+
+
+print("DNN model created")
 # CIN
-cin_model = tf.keras.Sequential([
-    tf.keras.layers.Dense(128, activation='relu', input_shape=(input_shape,)),
-    tf.keras.layers.Dense(64, activation='relu'),
-    tf.keras.layers.Dense(output_shape)
-])
+
+# Create and compile the model
+cin_out = CIN_model_creator(concatenated.shape[1], hidden_layers=2)
 print("CIN done")
-# Define the final output layer for the combined model
-combined_output = tf.keras.layers.Add()([dnn_model.output, cin_model.output])
-final_output = tf.keras.layers.Dense(output_shape)(combined_output)
-print("Final")
-# Create the combined model
-combined_model = tf.keras.models.Model(inputs=[dnn_model.input, cin_model.input], outputs=final_output)
+dnn_out = dnn_model(concatenated)
+print("dnn out")
+
+# Define the input layer
+input_layer = tf.keras.layers.Input(shape=(input_shape,))
+
+# Combine the models
+combined_input = tf.keras.layers.concatenate([dnn_out, cin_out.output])
+combined_output = tf.keras.layers.Dense(1, activation='linear')(combined_input)
+combined_model = tf.keras.models.Model(inputs=[input_layer, cin_out.input], outputs=combined_output)
+
 print("Model combined")
+# Compile the combined model
+combined_model.compile(optimizer='adam', loss='binary_crossentropy')
+
 # Train the combined model on the concatenated features as input
-x = [concatenated, concatenated]
+x = concatenated
 y = df['qos_response_time'].values
 
-combined_model.compile(optimizer='adam', loss='mse')
-
-combined_model.fit(x, y, epochs=100)
+combined_model.fit([x, x], y, epochs=1)
 print("Model trained")
 
 
